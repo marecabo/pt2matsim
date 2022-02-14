@@ -108,7 +108,7 @@ public class ArtificialLinkImpl implements ArtificialLink {
 	}
 
 	@Override
-	public double getFlowCapacityPerSec() {
+	public double getCapacityPeriod() {
 		return 0;
 	}
 
