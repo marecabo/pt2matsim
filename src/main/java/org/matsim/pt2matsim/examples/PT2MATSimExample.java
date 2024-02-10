@@ -185,12 +185,12 @@ public final class PT2MATSimExample {
 				PublicTransitMappingConfigGroup.createDefaultConfig());
 		PublicTransitMappingConfigGroup ptmConfig = ConfigUtils.addOrGetModule(config, PublicTransitMappingConfigGroup.class);
 
-		ptmConfig.setInputNetworkFile(inter + "addison.xml.gz");
-		ptmConfig.setOutputNetworkFile(output + "addison_multimodalnetwork.xml.gz");
-		ptmConfig.setOutputScheduleFile(output+ "addison_schedule.xml.gz");
-		ptmConfig.setOutputStreetNetworkFile(output + "addison_streetnetwork.xml.gz");
-		ptmConfig.setInputScheduleFile(inter + "schedule_unmapped.xml.gz");
-		ptmConfig.setScheduleFreespeedModes(CollectionUtils.stringToSet("rail, light_rail"));
+		ptmConfig.inputNetworkFile = inter + "addison.xml.gz";
+		ptmConfig.outputNetworkFile = output + "addison_multimodalnetwork.xml.gz";
+		ptmConfig.outputScheduleFile = output + "addison_schedule.xml.gz";
+		ptmConfig.outputStreetNetworkFile = output + "addison_streetnetwork.xml.gz";
+		ptmConfig.inputScheduleFile = inter + "schedule_unmapped.xml.gz";
+		ptmConfig.scheduleFreespeedModes = CollectionUtils.stringToSet("rail, light_rail");
 		// Save the mapping config
 		// (usually done manually)
 		new ConfigWriter(config).write(configFile);

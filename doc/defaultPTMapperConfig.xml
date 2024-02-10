@@ -7,9 +7,9 @@
 		Must be >= 1. -->
 		<param name="candidateDistanceMultiplier" value="1.6" />
 		<!-- Path to the input network file. Not needed if PTMapper is called within another class. -->
-		<param name="inputNetworkFile" value="" />
+		<param name="inputNetworkFile" value="null" />
 		<!-- Path to the input schedule file. Not needed if PTMapper is called within another class. -->
-		<param name="inputScheduleFile" value="" />
+		<param name="inputScheduleFile" value="null" />
 		<!-- The maximal distance [meter] a link candidate is allowed to have from the stop facility.
 		No link candidates beyond this distance are added. -->
 		<param name="maxLinkCandidateDistance" value="90.0" />
@@ -28,12 +28,12 @@
 		<!-- Defines the number of numOfThreads that should be used for pseudoRouting. Default: 2. -->
 		<param name="numOfThreads" value="2" />
 		<!-- Path to the output network file. Not needed if PTMapper is used within another class. -->
-		<param name="outputNetworkFile" value="" />
+		<param name="outputNetworkFile" value="null" />
 		<!-- Path to the output schedule file. Not needed if PTMapper is used within another class. -->
-		<param name="outputScheduleFile" value="" />
+		<param name="outputScheduleFile" value="null" />
 		<!-- Path to the output car only network file. The input multimodal map is filtered. 
 		Not needed if PTMapper is used within another class. -->
-		<param name="outputStreetNetworkFile" value="" />
+		<param name="outputStreetNetworkFile" value="null" />
 		<!-- If true, stop facilities that are not used by any transit route are removed from the schedule. Default: true -->
 		<param name="removeNotUsedStopFacilities" value="true" />
 		<!-- The travel cost of a link candidate can be increased according to its distance to the

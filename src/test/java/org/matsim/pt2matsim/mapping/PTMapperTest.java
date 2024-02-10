@@ -18,7 +18,9 @@ import org.matsim.pt2matsim.tools.NetworkToolsTest;
 import org.matsim.pt2matsim.tools.ScheduleTools;
 import org.matsim.pt2matsim.tools.ScheduleToolsTest;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.matsim.pt2matsim.tools.ScheduleToolsTest.ROUTE_B;
 
@@ -33,10 +35,12 @@ public class PTMapperTest {
 
 	public static PublicTransitMappingConfigGroup initPTMConfig() {
 		PublicTransitMappingConfigGroup config = new PublicTransitMappingConfigGroup();
-		config.getModesToKeepOnCleanUp().add("car");
-		config.setNumOfThreads(2);
-		config.setNLinkThreshold(4);
-		config.setMaxLinkCandidateDistance(999.0);
+		Set<String> newModesToKeepOnCleanup = new HashSet<>(config.modesToKeepOnCleanUp);
+		newModesToKeepOnCleanup.add("car");
+		config.modesToKeepOnCleanUp = newModesToKeepOnCleanup;
+		config.numOfThreads = 2;
+		config.nLinkThreshold = 4;
+		config.maxLinkCandidateDistance = 999.0;
 		config.setCandidateDistanceMultiplier(1.0);
 
 		PublicTransitMappingConfigGroup.TransportModeAssignment mraBus = new PublicTransitMappingConfigGroup.TransportModeAssignment("bus");
@@ -92,7 +96,7 @@ public class PTMapperTest {
 	@Test
 	public void artificialLinks() {
 		PublicTransitMappingConfigGroup ptmConfig2 = initPTMConfig();
-		ptmConfig2.setMaxLinkCandidateDistance(3);
+		ptmConfig2.maxLinkCandidateDistance = 3;
 
 		TransitSchedule schedule2 = ScheduleToolsTest.initUnmappedSchedule();
 		Network network2 = NetworkToolsTest.initNetwork();
@@ -105,10 +109,12 @@ public class PTMapperTest {
 	@Test
 	public void noTransportModeAssignment() {
 		PublicTransitMappingConfigGroup noTMAConfig = new PublicTransitMappingConfigGroup();
-		noTMAConfig.getModesToKeepOnCleanUp().add("car");
-		noTMAConfig.setNumOfThreads(2);
-		noTMAConfig.setNLinkThreshold(4);
-		noTMAConfig.setMaxLinkCandidateDistance(999.0);
+		Set<String> newModesToKeepOnCleanup = new HashSet<>(noTMAConfig.modesToKeepOnCleanUp);
+		newModesToKeepOnCleanup.add("car");
+		noTMAConfig.modesToKeepOnCleanUp = newModesToKeepOnCleanup;
+		noTMAConfig.numOfThreads = 2;
+		noTMAConfig.nLinkThreshold = 4;
+		noTMAConfig.maxLinkCandidateDistance = 999.0;
 		noTMAConfig.setCandidateDistanceMultiplier(1.0);
 
 		TransitSchedule schedule2 = ScheduleToolsTest.initUnmappedSchedule();

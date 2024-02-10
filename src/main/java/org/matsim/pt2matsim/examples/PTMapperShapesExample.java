@@ -17,6 +17,8 @@ import org.matsim.pt2matsim.tools.ScheduleTools;
 import org.matsim.pt2matsim.tools.ShapeTools;
 
 import java.io.File;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @author polettif
@@ -51,17 +53,19 @@ public class PTMapperShapesExample {
 
 	public static PublicTransitMappingConfigGroup createTestPTMConfig() {
 		PublicTransitMappingConfigGroup config = new PublicTransitMappingConfigGroup();
-		config.getModesToKeepOnCleanUp().add("car");
+		Set<String> newModesToKeepOnCleanup = new HashSet<>(config.modesToKeepOnCleanUp);
+		newModesToKeepOnCleanup.add("car");
+		config.modesToKeepOnCleanUp = newModesToKeepOnCleanup;
 
-		config.setNLinkThreshold(16);
-		config.setMaxLinkCandidateDistance(100);
+		config.nLinkThreshold = 16;
+		config.maxLinkCandidateDistance = 100;
 		config.setCandidateDistanceMultiplier(1.1);
 
 		PublicTransitMappingConfigGroup.TransportModeAssignment mraBus = new PublicTransitMappingConfigGroup.TransportModeAssignment("bus");
 		mraBus.setNetworkModesStr("car,bus");
 		config.addParameterSet(mraBus);
 
-		config.setNumOfThreads(8);
+		config.numOfThreads = 8;
 
 		return config;
 	}

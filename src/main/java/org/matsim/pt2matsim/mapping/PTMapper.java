@@ -73,10 +73,10 @@ public class PTMapper {
 	private TransitSchedule schedule;
 
 	public static void mapScheduleToNetwork(TransitSchedule schedule, Network network, PublicTransitMappingConfigGroup config) {
-		if(config.getInputNetworkFile() != null) {
+		if (config.inputNetworkFile != null) {
 			log.warn("The input network file set in PublicTransitMappingConfigGroup is ignored");
 		}
-		if(config.getInputScheduleFile() != null) {
+		if (config.inputScheduleFile != null) {
 			log.warn("The input schedule file set in PublicTransitMappingConfigGroup is ignored");
 		}
 		new PTMapper(schedule, network).run(config);
@@ -108,21 +108,23 @@ public class PTMapper {
 		// use defaults
 		if(linkCandidateCreator == null) {
 			linkCandidateCreator = new LinkCandidateCreatorStandard(schedule, network,
-					config.getNLinkThreshold(),
+					config.nLinkThreshold,
 					config.getCandidateDistanceMultiplier(),
-					config.getMaxLinkCandidateDistance(),
+					config.maxLinkCandidateDistance,
 					config.getTransportModeAssignment());
 		}
 		
 		if(scheduleRoutersFactory == null) {
-			scheduleRoutersFactory = new ScheduleRoutersStandard.Factory(schedule, network, config.getTransportModeAssignment(), config.getTravelCostType(), config.getRoutingWithCandidateDistance());
+			scheduleRoutersFactory = new ScheduleRoutersStandard.Factory(schedule, network,
+					config.getTransportModeAssignment(), config.getTravelCostType(),
+					config.routingWithCandidateDistance);
 		}
 
 		run(linkCandidateCreator,
 			scheduleRoutersFactory,
-			config.getNumOfThreads(), config.getMaxTravelCostFactor(),
-			config.getScheduleFreespeedModes(), config.getModesToKeepOnCleanUp(),
-			config.getRemoveNotUsedStopFacilities());
+				config.numOfThreads, config.getMaxTravelCostFactor(),
+				config.scheduleFreespeedModes, config.modesToKeepOnCleanUp,
+				config.removeNotUsedStopFacilities);
 	}
 
 	/**

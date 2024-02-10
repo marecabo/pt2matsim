@@ -26,6 +26,8 @@ import org.matsim.core.utils.collections.CollectionUtils;
 import org.matsim.pt.transitSchedule.api.TransitRoute;
 import org.matsim.pt2matsim.run.PublicTransitMapper;
 
+import jakarta.validation.constraints.Positive;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -47,44 +49,81 @@ public class PublicTransitMappingConfigGroup extends ReflectiveConfigGroup {
 
 	public enum TravelCostType { linkLength, travelTime }
 
-	private static final String INPUT_NETWORK_FILE = "inputNetworkFile";
-	private static final String INPUT_SCHEDULE_FILE = "inputScheduleFile";
-	private static final String OUTPUT_NETWORK_FILE = "outputNetworkFile";
-	private static final String OUTPUT_SCHEDULE_FILE = "outputScheduleFile";
-	private static final String OUTPUT_STREET_NETWORK_FILE = "outputStreetNetworkFile";
-
 	private static final String TRAVEL_COST_TYPE = "travelCostType";
 	private static final String MAX_TRAVEL_COST_FACTOR = "maxTravelCostFactor";
-	private static final String SCHEDULE_FREESPEED_MODES = "scheduleFreespeedModes";
-	private static final String NUM_OF_THREADS = "numOfThreads";
-
-	private static final String MODES_TO_KEEP_ON_CLEAN_UP = "modesToKeepOnCleanUp";
-	private static final String REMOVE_NOT_USED_STOP_FACILITIES = "removeNotUsedStopFacilities";
 
 	private static final String N_LINK_THRESHOLD = "nLinkThreshold";
 	private static final String CANDIDATE_DISTANCE_MULTIPLIER = "candidateDistanceMultiplier";
-	private static final String MAX_LINK_CANDIDATE_DISTANCE = "maxLinkCandidateDistance";
 
 	private static final String ROUTING_WITH_CANDIDATE_DISTANCE = "routingWithCandidateDistance";
 
 	// default values
+	private static final int DEFAULT_N_LINK_THRESHOLD = 6;
 	private Map<String, Set<String>> transportModeAssignment = new HashMap<>();
-	private Set<String> scheduleFreespeedModes = PublicTransitMappingStrings.ARTIFICIAL_LINK_MODE_AS_SET;
-	private Set<String> modesToKeepOnCleanUp = new HashSet<>();
-	private double maxTravelCostFactor = 5.0;
-	private int numOfThreads = 2;
-	private boolean removeNotUsedStopFacilities = true;
 
-	private String inputNetworkFile = null;
-	private String inputScheduleFile = null;
-	private String outputNetworkFile = null;
-	private String outputStreetNetworkFile = null;
-	private String outputScheduleFile = null;
+	@Parameter
+	@Comment("After the schedule has been mapped, the free speed of links can be set according to the necessary travel \n" +
+			"\t\ttimes given by the transit schedule. The freespeed of a link is set to the minimal value needed by all \n" +
+			"\t\ttransit routes passing using it. This is recommended for \"" + PublicTransitMappingStrings.ARTIFICIAL_LINK_MODE + "\", additional \n" +
+			"\t\tmodes (especially \"rail\", if used) can be added, separated by commas.")
+	public Set<String> scheduleFreespeedModes = PublicTransitMappingStrings.ARTIFICIAL_LINK_MODE_AS_SET;
+
+	@Parameter
+	@Comment("All links that do not have a transit route on them are removed, except the ones \n" +
+			"\t\tlisted in this set (typically only car). Separated by comma.")
+	public Set<String> modesToKeepOnCleanUp = new HashSet<>();
+
+	@Positive
+	private double maxTravelCostFactor = 5.0;
+
+	@Parameter
+	@Positive
+	@Comment("Defines the number of numOfThreads that should be used for pseudoRouting. Default: 2.")
+	public int numOfThreads = 2;
+
+	@Parameter
+	@Comment("If true, stop facilities that are not used by any transit route are removed from the schedule. Default: true")
+	public boolean removeNotUsedStopFacilities = true;
+
+	@Parameter
+	@Comment("Path to the input network file. Not needed if PTMapper is called within another class.")
+	public String inputNetworkFile = null;
+
+	@Parameter
+	@Comment("Path to the input schedule file. Not needed if PTMapper is called within another class.")
+	public String inputScheduleFile = null;
+
+	@Parameter
+	@Comment("Path to the output network file. Not needed if PTMapper is used within another class.")
+	public String outputNetworkFile = null;
+
+	@Parameter
+	@Comment("Path to the output car only network file. The input multimodal map is filtered. \n" +
+			"\t\tNot needed if PTMapper is used within another class.")
+	public String outputStreetNetworkFile = null;
+
+	@Parameter
+	@Comment("Path to the output schedule file. Not needed if PTMapper is used within another class.")
+	public String outputScheduleFile = null;
+
 	private TravelCostType travelCostType = TravelCostType.linkLength;
 
-	private boolean routingWithCandidateDistance = true;
-	private int nLinkThreshold = 6;
-	private double maxLinkCandidateDistance = 90;
+	@Parameter
+	public boolean routingWithCandidateDistance = true;
+
+	@Parameter
+	@Positive
+	@Comment("Number of link candidates considered for all stops, depends on accuracy of stops and desired \n" +
+			"\t\tperformance. Somewhere between 4 and 10 seems reasonable for bus stops, depending on the\n" +
+			"\t\taccuracy of the stop facility coordinates and performance desires. Default: " + DEFAULT_N_LINK_THRESHOLD)
+	public int nLinkThreshold = DEFAULT_N_LINK_THRESHOLD;
+
+	@Parameter
+	@Positive
+	@Comment("The maximal distance [meter] a link candidate is allowed to have from the stop facility.\n" +
+			"\t\tNo link candidates beyond this distance are added.")
+	public double maxLinkCandidateDistance = 90;
+
 	private double candiateDistanceMulitplier = 1.6;
 
 	public PublicTransitMappingConfigGroup() {
@@ -96,7 +135,9 @@ public class PublicTransitMappingConfigGroup extends ReflectiveConfigGroup {
 	 */
 	public static PublicTransitMappingConfigGroup createDefaultConfig() {
 		PublicTransitMappingConfigGroup config = new PublicTransitMappingConfigGroup();
-		config.getModesToKeepOnCleanUp().add("car");
+		Set<String> newModesToKeepOnCleanup = new HashSet<>(config.modesToKeepOnCleanUp);
+		newModesToKeepOnCleanup.add("car");
+		config.modesToKeepOnCleanUp = newModesToKeepOnCleanup;
 
 		TransportModeAssignment tmaBus = new TransportModeAssignment("bus");
 		tmaBus.setNetworkModesStr("car,bus");
@@ -130,32 +171,14 @@ public class PublicTransitMappingConfigGroup extends ReflectiveConfigGroup {
 	@Override
 	public final Map<String, String> getComments() {
 		Map<String, String> map = super.getComments();
-		map.put(MODES_TO_KEEP_ON_CLEAN_UP,
-				"All links that do not have a transit route on them are removed, except the ones \n" +
-				"\t\tlisted in this set (typically only car). Separated by comma.");
 		map.put(TRAVEL_COST_TYPE,
 				"Defines which link attribute should be used for routing. Possible values \"" + TravelCostType.linkLength + "\" (default) \n" +
 				"\t\tand \"" + travelTime + "\".");
-		map.put(SCHEDULE_FREESPEED_MODES,
-				"After the schedule has been mapped, the free speed of links can be set according to the necessary travel \n" +
-				"\t\ttimes given by the transit schedule. The freespeed of a link is set to the minimal value needed by all \n" +
-				"\t\ttransit routes passing using it. This is recommended for \"" + PublicTransitMappingStrings.ARTIFICIAL_LINK_MODE + "\", additional \n" +
-				"\t\tmodes (especially \"rail\", if used) can be added, separated by commas.");
 		map.put(MAX_TRAVEL_COST_FACTOR,
 				"If all paths between two stops have a [travelCost] > [" + MAX_TRAVEL_COST_FACTOR + "] * [minTravelCost], \n" +
 				"\t\tan artificial link is created. If " + TRAVEL_COST_TYPE + " is " + travelTime + ", minTravelCost is the travel time\n" +
 				"\t\tbetween stops from the schedule. If " + TRAVEL_COST_TYPE + " is \n" +
 				"\t\t" + TravelCostType.linkLength + " minTravel cost is the beeline distance.");
-		map.put(NUM_OF_THREADS,
-				"Defines the number of numOfThreads that should be used for pseudoRouting. Default: 2.");
-		map.put(INPUT_NETWORK_FILE, "Path to the input network file. Not needed if PTMapper is called within another class.");
-		map.put(INPUT_SCHEDULE_FILE, "Path to the input schedule file. Not needed if PTMapper is called within another class.");
-		map.put(OUTPUT_NETWORK_FILE, "Path to the output network file. Not needed if PTMapper is used within another class.");
-		map.put(OUTPUT_STREET_NETWORK_FILE, "Path to the output car only network file. The input multimodal map is filtered. \n" +
-				"\t\tNot needed if PTMapper is used within another class.");
-		map.put(OUTPUT_SCHEDULE_FILE, "Path to the output schedule file. Not needed if PTMapper is used within another class.");
-		map.put(REMOVE_NOT_USED_STOP_FACILITIES,
-				"If true, stop facilities that are not used by any transit route are removed from the schedule. Default: true");
 		map.put(ROUTING_WITH_CANDIDATE_DISTANCE,
 				"The travel cost of a link candidate can be increased according to its distance to the\n" +
 				"\t\tstop facility x2. This tends to give more accurate results. If "+ TRAVEL_COST_TYPE +" is "+ travelTime +", freespeed on \n" +
@@ -166,13 +189,6 @@ public class PublicTransitMappingConfigGroup extends ReflectiveConfigGroup {
 				"After " + N_LINK_THRESHOLD + " link candidates have been found, additional link \n" +
 				"\t\tcandidates within [" + CANDIDATE_DISTANCE_MULTIPLIER + "] * [distance to the Nth link] are added to the set.\n" +
 				"\t\tMust be >= 1.");
-		map.put(N_LINK_THRESHOLD,
-				"Number of link candidates considered for all stops, depends on accuracy of stops and desired \n" +
-				"\t\tperformance. Somewhere between 4 and 10 seems reasonable for bus stops, depending on the\n" +
-				"\t\taccuracy of the stop facility coordinates and performance desires. Default: " + nLinkThreshold);
-		map.put(MAX_LINK_CANDIDATE_DISTANCE,
-				"The maximal distance [meter] a link candidate is allowed to have from the stop facility.\n" +
-				"\t\tNo link candidates beyond this distance are added.");
 		return map;
 	}
 
@@ -227,63 +243,6 @@ public class PublicTransitMappingConfigGroup extends ReflectiveConfigGroup {
 	}
 
 	/**
-	 * All links that do not have a transit route on them are removed, except
-	 * the ones listed in this set (typically only car).
-	 */
-
-	public Set<String> getModesToKeepOnCleanUp() {
-		return this.modesToKeepOnCleanUp;
-	}
-
-	public void setModesToKeepOnCleanUp(Set<String> modesToKeepOnCleanUp) {
-		this.modesToKeepOnCleanUp = modesToKeepOnCleanUp;
-	}
-
-	@StringSetter(MODES_TO_KEEP_ON_CLEAN_UP)
-	private void setModesToKeepOnCleanUpStr(String modesToKeepOnCleanUp) {
-		if(modesToKeepOnCleanUp == null) {
-			this.modesToKeepOnCleanUp = null;
-			return;
-		}
-		this.modesToKeepOnCleanUp = CollectionUtils.stringToSet(modesToKeepOnCleanUp);
-	}
-
-	@StringGetter(MODES_TO_KEEP_ON_CLEAN_UP)
-	private String getModesToKeepOnCleanUpString() {
-		if(modesToKeepOnCleanUp == null) {
-			return "";
-		} else {
-			return CollectionUtils.setToString(modesToKeepOnCleanUp);
-		}
-	}
-
-	/**
-	 *
-	 */
-	@StringGetter(REMOVE_NOT_USED_STOP_FACILITIES)
-	public boolean getRemoveNotUsedStopFacilities() {
-		return removeNotUsedStopFacilities;
-	}
-
-	@StringSetter(REMOVE_NOT_USED_STOP_FACILITIES)
-	public void setRemoveNotUsedStopFacilities(boolean v) {
-		this.removeNotUsedStopFacilities = v;
-	}
-
-	/**
-	 * Threads
-	 */
-	@StringGetter(NUM_OF_THREADS)
-	public int getNumOfThreads() {
-		return numOfThreads;
-	}
-
-	@StringSetter(NUM_OF_THREADS)
-	public void setNumOfThreads(int numOfThreads) {
-		this.numOfThreads = numOfThreads;
-	}
-
-	/**
 	 *
 	 */
 	@StringGetter(TRAVEL_COST_TYPE)
@@ -308,151 +267,13 @@ public class PublicTransitMappingConfigGroup extends ReflectiveConfigGroup {
 
 	@StringSetter(MAX_TRAVEL_COST_FACTOR)
 	public void setMaxTravelCostFactor(double maxTravelCostFactor) {
-		if(maxTravelCostFactor < 1) {
-			throw new RuntimeException("maxTravelCostFactor cannnot be less than 1!");
-		}
+		checkMaxTravelCostFactor(maxTravelCostFactor);
 		this.maxTravelCostFactor = maxTravelCostFactor;
-	}
-
-	/**
-	 *
-	 */
-	@StringGetter(SCHEDULE_FREESPEED_MODES)
-	public String getScheduleFreespeedModesStr() {
-		if(this.scheduleFreespeedModes == null) {
-			return "";
-		} else {
-			return CollectionUtils.setToString(this.scheduleFreespeedModes);
-		}
-	}
-
-	@StringSetter(SCHEDULE_FREESPEED_MODES)
-	public void setScheduleFreespeedModesStr(String modes) {
-		this.scheduleFreespeedModes.addAll(CollectionUtils.stringToSet(modes));
-	}
-
-	public Set<String> getScheduleFreespeedModes() {
-		return scheduleFreespeedModes;
-	}
-
-
-	public void setScheduleFreespeedModes(Set<String> modes) {
-		this.scheduleFreespeedModes.addAll(modes);
-	}
-
-	/**
-	 * Params for filepaths
-	 */
-	@StringGetter(INPUT_NETWORK_FILE)
-	public String getNetworkFileStr() {
-		return this.inputNetworkFile == null ? "" : this.inputNetworkFile;
-	}
-
-	public String getInputNetworkFile() {
-		return this.inputNetworkFile;
-	}
-
-	@StringSetter(INPUT_NETWORK_FILE)
-	public void setInputNetworkFile(String inputNetworkFile) {
-		this.inputNetworkFile = inputNetworkFile.equals("") ? null : inputNetworkFile;
-	}
-
-	@StringGetter(INPUT_SCHEDULE_FILE)
-	public String getScheduleFileStr() {
-		return this.inputScheduleFile == null ? "" : this.inputScheduleFile;
-	}
-
-	public String getInputScheduleFile() {
-		return this.inputScheduleFile;
-	}
-
-	@StringSetter(INPUT_SCHEDULE_FILE)
-	public void setInputScheduleFile(String inputScheduleFile) {
-		this.inputScheduleFile = inputScheduleFile.equals("") ? null : inputScheduleFile;
-	}
-
-	@StringGetter(OUTPUT_NETWORK_FILE)
-	public String getOutputNetworkFile() {
-		return this.outputNetworkFile == null ? "" : this.outputNetworkFile;
-	}
-
-	@StringSetter(OUTPUT_NETWORK_FILE)
-	public String setOutputNetworkFile(String outputNetwork) {
-		final String old = this.outputNetworkFile;
-		this.outputNetworkFile = outputNetwork;
-		return old;
-	}
-
-	@StringGetter(OUTPUT_STREET_NETWORK_FILE)
-	public String getOutputStreetNetworkFileStr() {
-		return this.outputStreetNetworkFile == null ? "" : this.outputStreetNetworkFile;
-	}
-
-	public String getOutputStreetNetworkFile() {
-		return this.outputStreetNetworkFile;
-	}
-
-	@StringSetter(OUTPUT_STREET_NETWORK_FILE)
-	public void setOutputStreetNetworkFile(String outputStreetNetworkFile) {
-		this.outputStreetNetworkFile = outputStreetNetworkFile.equals("") ? null : outputStreetNetworkFile;
-	}
-
-	public String getOutputScheduleFile() {
-		return this.outputScheduleFile;
-	}
-
-	@StringGetter(OUTPUT_SCHEDULE_FILE)
-	public String getOutputScheduleFileStr() {
-		return this.outputScheduleFile == null ? "" : this.outputScheduleFile;
-	}
-
-	@StringSetter(OUTPUT_SCHEDULE_FILE)
-	public String setOutputScheduleFile(String outputSchedule) {
-		final String old = this.outputScheduleFile;
-		this.outputScheduleFile = outputSchedule;
-		return old;
-	}
-
-	@StringGetter(ROUTING_WITH_CANDIDATE_DISTANCE)
-	public boolean getRoutingWithCandidateDistance() {
-		return routingWithCandidateDistance;
-	}
-
-
-	@StringSetter(ROUTING_WITH_CANDIDATE_DISTANCE)
-	public void setRoutingWithCandidateDistance(boolean v) {
-		this.routingWithCandidateDistance = v;
 	}
 
 	/*
 	Link Candidates
 	 */
-
-	/**
-	 * max n closest links
-	 */
-	@StringGetter(N_LINK_THRESHOLD)
-	public int getNLinkThreshold() {
-		return nLinkThreshold;
-	}
-
-	@StringSetter(N_LINK_THRESHOLD)
-	public void setNLinkThreshold(int n) {
-		this.nLinkThreshold = n;
-	}
-
-	/**
-	 * max distance
-	 */
-	@StringGetter(MAX_LINK_CANDIDATE_DISTANCE)
-	public double getMaxLinkCandidateDistance() {
-		return maxLinkCandidateDistance;
-	}
-
-	@StringSetter(MAX_LINK_CANDIDATE_DISTANCE)
-	public void setMaxLinkCandidateDistance(double maxLinkCandidateDistance) {
-		this.maxLinkCandidateDistance = maxLinkCandidateDistance;
-	}
 
 	/**
 	 * Defines the radius [meter] from a stop facility within nodes are searched.
@@ -466,6 +287,18 @@ public class PublicTransitMappingConfigGroup extends ReflectiveConfigGroup {
 	@StringSetter(CANDIDATE_DISTANCE_MULTIPLIER)
 	public void setCandidateDistanceMultiplier(double multiplier) {
 		this.candiateDistanceMulitplier = multiplier < 1 ? 1 : multiplier;
+	}
+
+	@Override
+	protected void checkConsistency(Config config) {
+		checkMaxTravelCostFactor(this.maxTravelCostFactor);
+		super.checkConsistency(config);
+	}
+
+	private static void checkMaxTravelCostFactor(double maxTravelCostFactor) {
+		if (maxTravelCostFactor < 1) {
+			throw new RuntimeException("maxTravelCostFactor cannot be less than 1!");
+		}
 	}
 
 
@@ -534,4 +367,5 @@ public class PublicTransitMappingConfigGroup extends ReflectiveConfigGroup {
 			this.networkModes = networkModes;
 		}
 	}
+
 }

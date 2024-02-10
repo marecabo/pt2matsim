@@ -73,7 +73,8 @@ public class LinkCandidateCreatorStandard implements LinkCandidateCreator {
 	}
 
 	public LinkCandidateCreatorStandard(TransitSchedule schedule, Network network, PublicTransitMappingConfigGroup config) {
-		this(schedule, network, config.getNLinkThreshold(), config.getCandidateDistanceMultiplier(), config.getMaxLinkCandidateDistance(), config.getTransportModeAssignment());
+		this(schedule, network, config.nLinkThreshold, config.getCandidateDistanceMultiplier(),
+				config.maxLinkCandidateDistance, config.getTransportModeAssignment());
 	}
 
 	private void load() {

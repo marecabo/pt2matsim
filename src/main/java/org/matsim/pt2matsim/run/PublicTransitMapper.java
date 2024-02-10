@@ -78,24 +78,26 @@ public final class PublicTransitMapper {
 		PublicTransitMappingConfigGroup config = PublicTransitMappingConfigGroup.loadConfig(configFile);
 
 		// Load input schedule and network
-		TransitSchedule schedule = config.getInputScheduleFile() == null ? null : ScheduleTools.readTransitSchedule(config.getInputScheduleFile());
-		Network network = config.getInputNetworkFile() == null ? null : NetworkTools.readNetwork(config.getInputNetworkFile());
+		TransitSchedule schedule = config.inputScheduleFile == null ? null : ScheduleTools.readTransitSchedule(config.inputScheduleFile);
+		Network network = config.inputNetworkFile == null ? null : NetworkTools.readNetwork(config.inputNetworkFile);
 
 		// Run PTMapper
 		PTMapper.mapScheduleToNetwork(schedule, network, config);
 		// or: new PTMapper(schedule, network).run(config);
 
 		// Write the schedule and network to output files (if defined in config)
-		if(config.getOutputNetworkFile() != null && config.getOutputScheduleFile() != null) {
+		if (config.outputNetworkFile != null && config.outputScheduleFile != null) {
 			log.info("Writing schedule and network to file...");
 			try {
-				ScheduleTools.writeTransitSchedule(schedule, config.getOutputScheduleFile());
-				NetworkTools.writeNetwork(network, config.getOutputNetworkFile());
+				ScheduleTools.writeTransitSchedule(schedule, config.outputScheduleFile);
+				NetworkTools.writeNetwork(network, config.outputNetworkFile);
 			} catch (Exception e) {
 				log.error("Cannot write to output directory!");
 			}
-			if(config.getOutputStreetNetworkFile() != null) {
-				NetworkTools.writeNetwork(NetworkTools.createFilteredNetworkByLinkMode(network, Collections.singleton(TransportMode.car)), config.getOutputStreetNetworkFile());
+			if (config.outputStreetNetworkFile != null) {
+				NetworkTools.writeNetwork(
+						NetworkTools.createFilteredNetworkByLinkMode(network, Collections.singleton(TransportMode.car)),
+						config.outputStreetNetworkFile);
 			}
 		} else {
 			log.info("No output paths defined, schedule and network are not written to files.");

@@ -177,7 +177,7 @@ public class ScheduleRoutersStandard implements ScheduleRouters {
 		}
 		
 		public Factory(TransitSchedule schedule, Network network, PublicTransitMappingConfigGroup config) {
-			this(schedule, network, config.getTransportModeAssignment(), config.getTravelCostType(), config.getRoutingWithCandidateDistance());
+			this(schedule, network, config.getTransportModeAssignment(), config.getTravelCostType(), config.routingWithCandidateDistance);
 		}
 
 		@Override
