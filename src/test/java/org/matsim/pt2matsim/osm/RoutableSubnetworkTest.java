@@ -33,10 +33,10 @@ public class RoutableSubnetworkTest {
 		for (ConfigGroup params : osmConfig.getParameterSets(OsmConverterConfigGroup.OsmWayParams.SET_NAME)) {
 			OsmConverterConfigGroup.OsmWayParams wayParams = (OsmConverterConfigGroup.OsmWayParams) params;
 			
-			if (wayParams.getAllowedTransportModes().contains("car")) {
-				Set<String> allowedTransportModes = new HashSet<>(wayParams.getAllowedTransportModes());
+			if (wayParams.allowedTransportModes.contains("car")) {
+				Set<String> allowedTransportModes = new HashSet<>(wayParams.allowedTransportModes);
 				allowedTransportModes.add("car_passenger");
-				wayParams.setAllowedTransportModes(allowedTransportModes);
+				wayParams.allowedTransportModes = allowedTransportModes;
 			}
 		}
 
