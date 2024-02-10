@@ -62,7 +62,7 @@ public class PTMapperShapesExample {
 		config.setCandidateDistanceMultiplier(1.1);
 
 		PublicTransitMappingConfigGroup.TransportModeAssignment mraBus = new PublicTransitMappingConfigGroup.TransportModeAssignment("bus");
-		mraBus.setNetworkModesStr("car,bus");
+		mraBus.networkModes = Set.of("car", "bus");
 		config.addParameterSet(mraBus);
 
 		config.numOfThreads = 8;
