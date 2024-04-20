@@ -108,7 +108,7 @@ public final class Osm {
 
 		/**
 		 * @return the role the given member has. <tt>null</tt> if element is not
-		 * a member or no role is assigned
+		 *         a member or no role is assigned
 		 */
 		String getMemberRole(Element member);
 
@@ -141,7 +141,7 @@ public final class Osm {
 		public static final String PSV = "psv";
 		public static final String BUS = "bus";
 		public static final String TAXI = "taxi";
-		
+
 		public static final String FORWARD = "forward";
 		public static final String BACKWARD = "backward";
 
@@ -164,15 +164,16 @@ public final class Osm {
 		public static final String CROSSING = "crossing";
 
 		public static final List<String> DEFAULT_KEYS = Arrays.asList(
-				NAME, ROUTE, ROUTE_MASTER, PUBLIC_TRANSPORT, RAILWAY, HIGHWAY, SERVICE, LANES, JUNCTION, ONEWAY, ACCESS, PSV,
+				NAME, ROUTE, ROUTE_MASTER, PUBLIC_TRANSPORT, RAILWAY, HIGHWAY, SERVICE, LANES, JUNCTION, ONEWAY, ACCESS,
+				PSV,
 				TYPE, NETWORK, VEHICLE, TUNNEL, TRAFFIC_CALMING, PASSING_PLACES, MOTORCYCLE, FOOTWAY, CROSSING);
 		public static final List<String> DIRECTIONS = Arrays.asList(FORWARD, BACKWARD);
-		
+
 		public static String combinedKey(String... keyParts) {
 			return Joiner.on(":").join(keyParts);
 		}
 	}
-	
+
 	/**
 	 * OSM values used by the converters
 	 */
@@ -220,7 +221,7 @@ public final class Osm {
 		// values for psv=*
 		public static final String YES = "yes";
 		public static final String DESIGNATED = "designated";
-		
+
 		// values for maxspeed=*
 		public static final String WALK = "walk";
 		public static final String NONE = "none";
@@ -231,6 +232,5 @@ public final class Osm {
 		public static final String TO = "to";
 
 	}
-
 
 }
