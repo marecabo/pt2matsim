@@ -45,6 +45,7 @@ import org.matsim.pt2matsim.tools.PTMapperTools;
 import org.matsim.pt2matsim.tools.ScheduleTools;
 import org.matsim.pt2matsim.tools.debug.ScheduleCleaner;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -185,12 +186,13 @@ public class PTMapper {
 		}
 
 		// initiate pseudoRouting workers (each owns its own ScheduleRouters instance)
-		PseudoRouting[] pseudoRoutingRunnables = new PseudoRouting[numThreads];
+		PseudoRoutingImpl[] pseudoRoutingRunnables = new PseudoRoutingImpl[numThreads];
 		for(int i = 0; i < numThreads; i++) {
 			pseudoRoutingRunnables[i] = new PseudoRoutingImpl(scheduleRoutersFactory, linkCandidates,
-					maxTravelCostFactor, progress, sharedQueue);
+					maxTravelCostFactor, progress, sharedQueue, "pseudoRouting-" + i);
 		}
 
+		long phase1Start = System.nanoTime();
 		Thread[] threads = new Thread[numThreads];
 		// start pseudoRouting
 		for(int i = 0; i < numThreads; i++) {
@@ -205,6 +207,8 @@ public class PTMapper {
 				throw new RuntimeException(e);
 			}
 		}
+		logPhase("PseudoRouting", System.nanoTime() - phase1Start);
+		logGlobalSlowestRoutes(pseudoRoutingRunnables, 10);
 
 
 		/* [2]
@@ -213,10 +217,12 @@ public class PTMapper {
 		 */
 		log.info("=====================================");
 		log.info("Adding artificial links to network...");
+		long phase2Start = System.nanoTime();
 		for(PseudoRouting prt : pseudoRoutingRunnables) {
 			prt.addArtificialLinks(network);
 			pseudoSchedule.mergePseudoSchedule(prt.getPseudoSchedule());
 		}
+		logPhase("AddArtificialLinks+MergePseudoSchedule", System.nanoTime() - phase2Start);
 
 
 		/* [3]
@@ -225,7 +231,9 @@ public class PTMapper {
 		 */
 		log.info("==========================================================================================");
 		log.info("Replacing parent StopFacilities in schedule, creating link sequences for transit routes...");
+		long phase3Start = System.nanoTime();
 		pseudoSchedule.createFacilitiesAndLinkSequences(schedule, numThreads, chunkSize);
+		logPhase("CreateFacilitiesAndLinkSequences", System.nanoTime() - phase3Start);
 
 		/* [4]
 		  Now that all lines have been routed, it is possible that a route passes
@@ -233,15 +241,22 @@ public class PTMapper {
 		 */
 		log.info("================================");
 		log.info("Pulling child stop facilities...");
+		long phase4Start = System.nanoTime();
 		int nPulled = 1;
+		int pullPasses = 0;
 		while(nPulled != 0) {
 			nPulled = PTMapperTools.pullChildStopFacilitiesTogether(this.schedule, this.network);
+			pullPasses++;
 		}
+		log.info(String.format("PullChildStopFacilities: %d fixpoint passes", pullPasses));
+		logPhase("PullChildStopFacilities", System.nanoTime() - phase4Start);
 
 		/* [5] */
 		log.info("==========================================");
 		log.info("Add transfers for child stop facilities...");
+		long phase5Start = System.nanoTime();
 		PTMapperTools.addTransfersForChildStopFacilities(this.schedule);
+		logPhase("AddTransfersForChildStopFacilities", System.nanoTime() - phase5Start);
 
 		/* [6]
 		  After all lines are created, clean the schedule and network. Removing
@@ -250,14 +265,18 @@ public class PTMapper {
 		 */
 		log.info("=============================");
 		log.info("Clean schedule and network...");
+		long phase6Start = System.nanoTime();
 		cleanScheduleAndNetwork(scheduleFreespeedModes, modesToKeepOnCleanup, removeNotUsedStopFacilities);
+		logPhase("CleanScheduleAndNetwork", System.nanoTime() - phase6Start);
 
 		/* [7]
 		  Validate the schedule
 		 */
 		log.info("======================");
 		log.info("Validating schedule...");
+		long phase7Start = System.nanoTime();
 		printValidateSchedule();
+		logPhase("ValidateSchedule", System.nanoTime() - phase7Start);
 
 		log.info("==================================================");
 		log.info("= Mapping transit schedule to network completed! =");
@@ -267,6 +286,38 @@ public class PTMapper {
 		  Statistics
 		 */
 		printStatistics(nStopFacilities);
+	}
+
+	private static void logPhase(String name, long elapsedNanos) {
+		log.info(String.format("PTMapper phase [%s] completed in %.2fs", name, elapsedNanos / 1e9));
+	}
+
+	/**
+	 * Aggregates the per-worker slowest-route lists and logs the global top-N.
+	 * Helps identify which routes dominate the pseudoRouting wall-clock.
+	 */
+	private static void logGlobalSlowestRoutes(PseudoRoutingImpl[] workers, int topN) {
+		List<PseudoRoutingImpl.RouteTiming> all = new ArrayList<>();
+		long sumRouteNanos = 0L;
+		long sumRoutes = 0L;
+		for (PseudoRoutingImpl w : workers) {
+			all.addAll(w.getSlowestRoutes());
+			sumRouteNanos += w.getTotalRouteNanos();
+			sumRoutes += w.getRoutesProcessed();
+		}
+		all.sort((a, b) -> Long.compare(b.elapsedNanos(), a.elapsedNanos()));
+		log.info(String.format("PseudoRouting aggregate: routes=%d sumPerRouteTime=%.1fs (across %d workers)",
+				sumRoutes, sumRouteNanos / 1e9, workers.length));
+		if (all.isEmpty()) {
+			return;
+		}
+		int limit = Math.min(topN, all.size());
+		log.info(String.format("PseudoRouting global slowest %d routes:", limit));
+		for (int i = 0; i < limit; i++) {
+			PseudoRoutingImpl.RouteTiming rt = all.get(i);
+			log.info(String.format("    line=%s route=%s mode=%s stops=%d pairs=%d elapsed=%.2fs",
+					rt.lineId(), rt.routeId(), rt.mode(), rt.nStops(), rt.candidatePairs(), rt.elapsedNanos() / 1e9));
+		}
 	}
 
 	private void cleanScheduleAndNetwork(Set<String> scheduleFreespeedModes, Set<String> modesToKeepOnCleanup, boolean removeNotUsedStopFacilities) {
