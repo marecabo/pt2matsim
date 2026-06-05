@@ -84,35 +84,53 @@ public class PseudoRoutingImpl implements PseudoRouting {
 
 	private final PseudoSchedule threadPseudoSchedule = new PseudoScheduleImpl();
 	private final double maxTravelCostFactor;
+	private final boolean boundedSearch;
 
 	// per-worker timing stats
 	private long routesProcessed = 0L;
 	private long totalRouteNanos = 0L;
+	private long nullReturns = 0L;
+	private long pairsRouted = 0L;
 	private final PriorityQueue<RouteTiming> slowest = new PriorityQueue<>(
 			Comparator.comparingLong(RouteTiming::elapsedNanos));
 
 	/**
-	 * Backward-compatible constructor: the runnable owns a private queue.
+	 * Backward-compatible constructor: the runnable owns a private queue and bounded search is disabled.
 	 * Prefer the shared-queue overload below so multiple workers can balance load dynamically.
 	 */
 	public PseudoRoutingImpl(ScheduleRoutersFactory scheduleRoutersFactory, LinkCandidateCreator linkCandidates,
 			double maxTravelCostFactor, Progress progress) {
 		this(scheduleRoutersFactory, linkCandidates, maxTravelCostFactor, progress,
-				new ConcurrentLinkedQueue<>(), "pseudoRouting");
+				new ConcurrentLinkedQueue<>(), "pseudoRouting", false);
+	}
+
+	/**
+	 * Shared-queue constructor with bounded search disabled (backward compatible).
+	 */
+	public PseudoRoutingImpl(ScheduleRoutersFactory scheduleRoutersFactory, LinkCandidateCreator linkCandidates,
+			double maxTravelCostFactor, Progress progress, Queue<QueuedRoute> sharedQueue, String workerName) {
+		this(scheduleRoutersFactory, linkCandidates, maxTravelCostFactor, progress, sharedQueue, workerName, false);
 	}
 
 	/**
 	 * Shared-queue constructor. All workers given the same {@code sharedQueue} poll dynamically,
 	 * so a thread that finishes early picks up routes pending on slower threads.
+	 *
+	 * @param boundedSearch if true, route queries pass {@code maxAllowedTravelCost} as a cutoff to
+	 *                      the underlying {@link org.matsim.core.router.util.LeastCostPathCalculator}.
+	 *                      Output is byte-identical to the unbounded variant because any path with
+	 *                      {@code cost >= maxAllowedTravelCost} is already discarded by the caller.
 	 */
 	public PseudoRoutingImpl(ScheduleRoutersFactory scheduleRoutersFactory, LinkCandidateCreator linkCandidates,
-			double maxTravelCostFactor, Progress progress, Queue<QueuedRoute> sharedQueue, String workerName) {
+			double maxTravelCostFactor, Progress progress, Queue<QueuedRoute> sharedQueue, String workerName,
+			boolean boundedSearch) {
 		this.maxTravelCostFactor = maxTravelCostFactor;
 		this.scheduleRouters = scheduleRoutersFactory.createInstance();
 		this.linkCandidates = linkCandidates;
 		this.progress = progress;
 		this.queue = sharedQueue;
 		this.workerName = workerName;
+		this.boundedSearch = boundedSearch;
 	}
 
 	@Override
@@ -133,6 +151,20 @@ public class PseudoRoutingImpl implements PseudoRouting {
 
 	public long getTotalRouteNanos() {
 		return totalRouteNanos;
+	}
+
+	/** Number of {@code calcLeastCostPath} calls that returned {@code null}. This conflates two
+	 *  cases: cutoff-fired (bounded search proved no path within {@code maxAllowedTravelCost}
+	 *  exists) and genuinely unreachable (full subgraph exhausted). With {@code boundedSearch}
+	 *  enabled the former dominates and runs in milliseconds; with it disabled only the latter
+	 *  occurs and each one costs seconds-to-minutes on disconnected components. */
+	public long getNullReturns() {
+		return nullReturns;
+	}
+
+	/** Number of pairs for which a Dijkstra/ALT search was performed (loop-link pairs are skipped). */
+	public long getPairsRouted() {
+		return pairsRouted;
 	}
 
 	@Override
@@ -159,9 +191,11 @@ public class PseudoRoutingImpl implements PseudoRouting {
 		}
 		long workerElapsed = System.nanoTime() - workerStart;
 		double avgMs = routesProcessed == 0 ? 0.0 : (totalRouteNanos / 1e6 / (double) routesProcessed);
+		double nullPct = pairsRouted == 0 ? 0.0 : (100.0 * nullReturns / (double) pairsRouted);
 		log.info(String.format(
-				"[%s] finished: routes=%d wall=%.1fs sumPerRoute=%.1fs avgPerRoute=%.0fms",
-				workerName, routesProcessed, workerElapsed / 1e9, totalRouteNanos / 1e9, avgMs));
+				"[%s] finished: routes=%d wall=%.1fs sumPerRoute=%.1fs avgPerRoute=%.0fms pairsRouted=%d nullReturns=%d (%.1f%%)",
+				workerName, routesProcessed, workerElapsed / 1e9, totalRouteNanos / 1e9, avgMs,
+				pairsRouted, nullReturns, nullPct));
 		List<RouteTiming> top = getSlowestRoutes();
 		if (!top.isEmpty()) {
 			log.info(String.format("[%s] slowest %d routes on this worker:", workerName, top.size()));
@@ -241,9 +275,19 @@ public class PseudoRoutingImpl implements PseudoRouting {
 					 */
 					if(!linkCandidateCurrent.isLoopLink() && !linkCandidateNext.isLoopLink()) {
 						/*
-						  Calculate the least cost path on the network
+						  Calculate the least cost path on the network. When boundedSearch is enabled
+						  and minTravelCost > 0, pass maxAllowedTravelCost as a cutoff so the underlying
+						  Dijkstra/ALT can abort as soon as no path <= cutoff is provably reachable.
+						  This is equivalent to the unbounded search for downstream purposes because the
+						  caller below already discards any returned path with cost >= maxAllowedTravelCost
+						  and replaces it with an artificial link.
 						 */
-						LeastCostPathCalculator.Path leastCostPath = scheduleRouters.calcLeastCostPath(linkCandidateCurrent, linkCandidateNext, transitLine, transitRoute);
+						double cutoff = (boundedSearch && minTravelCost > 0.0)
+								? maxAllowedTravelCost
+								: Double.POSITIVE_INFINITY;
+						pairsRouted++;
+						LeastCostPathCalculator.Path leastCostPath = scheduleRouters.calcLeastCostPath(
+								linkCandidateCurrent, linkCandidateNext, transitLine, transitRoute, cutoff);
 
 						if(leastCostPath != null) {
 							pathCost = leastCostPath.travelCost;
@@ -252,6 +296,8 @@ public class PseudoRoutingImpl implements PseudoRouting {
 							if(linkCandidateCurrent.getLink().getId().equals(linkCandidateNext.getLink().getId())) {
 								pathCost *= 4;
 							}
+						} else {
+							nullReturns++;
 						}
 						useExistingNetworkLinks = pathCost < maxAllowedTravelCost;
 					}

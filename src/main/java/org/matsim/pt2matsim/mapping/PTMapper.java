@@ -124,7 +124,8 @@ public class PTMapper {
 			scheduleRoutersFactory,
 			config.getNumOfThreads(), config.getMaxTravelCostFactor(),
 			config.getScheduleFreespeedModes(), config.getModesToKeepOnCleanUp(),
-			config.getRemoveNotUsedStopFacilities(), config.getChunkSize());
+			config.getRemoveNotUsedStopFacilities(), config.getChunkSize(),
+			config.getBoundedSearch());
 	}
 
 	/**
@@ -133,6 +134,21 @@ public class PTMapper {
 	 * @throws InterruptedException 
 	 */
 	public void run(LinkCandidateCreator linkCandidates, ScheduleRoutersFactory scheduleRoutersFactory, int numThreads, double maxTravelCostFactor, Set<String> scheduleFreespeedModes, Set<String> modesToKeepOnCleanup, boolean removeNotUsedStopFacilities, int chunkSize) throws InterruptedException, ExecutionException {
+		run(linkCandidates, scheduleRoutersFactory, numThreads, maxTravelCostFactor, scheduleFreespeedModes,
+				modesToKeepOnCleanup, removeNotUsedStopFacilities, chunkSize, false);
+	}
+
+	/**
+	 * Maps the schedule to the network.
+	 *
+	 * @param boundedSearch if true, route queries pass {@code maxAllowedTravelCost} as a cutoff to the
+	 *                      underlying Dijkstra/ALT — pairs that are unreachable within that bound return
+	 *                      null quickly instead of exhausting the reachable subgraph. Output is
+	 *                      byte-identical because such paths are already discarded downstream.
+	 * @throws ExecutionException
+	 * @throws InterruptedException
+	 */
+	public void run(LinkCandidateCreator linkCandidates, ScheduleRoutersFactory scheduleRoutersFactory, int numThreads, double maxTravelCostFactor, Set<String> scheduleFreespeedModes, Set<String> modesToKeepOnCleanup, boolean removeNotUsedStopFacilities, int chunkSize, boolean boundedSearch) throws InterruptedException, ExecutionException {
 		if(schedule == null) throw new RuntimeException("No schedule defined!");
 		if(network == null) throw new RuntimeException("No network defined!");
 
@@ -189,7 +205,7 @@ public class PTMapper {
 		PseudoRoutingImpl[] pseudoRoutingRunnables = new PseudoRoutingImpl[numThreads];
 		for(int i = 0; i < numThreads; i++) {
 			pseudoRoutingRunnables[i] = new PseudoRoutingImpl(scheduleRoutersFactory, linkCandidates,
-					maxTravelCostFactor, progress, sharedQueue, "pseudoRouting-" + i);
+					maxTravelCostFactor, progress, sharedQueue, "pseudoRouting-" + i, boundedSearch);
 		}
 
 		long phase1Start = System.nanoTime();
